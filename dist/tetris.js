@@ -342,7 +342,7 @@ var calcRewards = function(rows){
 */
 var calcScore = function(rows){
 	if (rows&&rows.length){
-		return rows.length*100;
+		return rows.length;
 	}
 	return 0;
 };
@@ -512,11 +512,11 @@ Tetris.prototype = {
 			removeRows(this.matrix,rows);
 			
 			var score = calcScore(rows);
-			var reward = calcRewards(rows);
-			this.score += score + reward;
+			//var reward = calcRewards(rows);
+			this.score += score;
 
 			views.setScore(this.score);
-			views.setReward(reward);
+			//views.setReward(reward);
 
 		}
 	},
