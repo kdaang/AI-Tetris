@@ -3,6 +3,7 @@ var consts = require('./consts.js');
 var shapes = require('./shapes.js');
 var views = require('./views.js');
 var canvas = require('./canvas.js');
+var network = require('./AI.js');
 
 
 
@@ -21,6 +22,19 @@ var initMatrix = function(rowCount,columnCount){
 	}
 
 	return result;
+};
+
+var copyMatrix = function(matrix){
+    var copiedMatrix = [];
+    for (var i = 0; i<matrix.length;i++){
+        var row = [];
+        copiedMatrix.push(row);
+        for(var j = 0;j<matrix[i].length;j++){
+            row.push(matrix[i][j]);
+        }
+    }
+
+    return copiedMatrix;
 };
 
 /**
@@ -149,12 +163,12 @@ Tetris.prototype = {
 		canvas.init(views.scene,views.preview);
 
 		this.matrix = initMatrix(consts.ROW_COUNT,consts.COLUMN_COUNT);
+		this.genes = network.createPopulation(8);
+        this.geneIndex = 0;
 		this.reset();
 
 		this._initEvents();
 		this._fireShape();
-
-
 	},
 	//Reset game
 	reset:function(){
@@ -260,6 +274,9 @@ Tetris.prototype = {
 	_update:function(){
 		if (this.shape.canDown(this.matrix)){
 			this.shape.goDown(this.matrix);
+			var bestMove = calculateMove(copyMatrix(this.matrix), shapes.copyShape(this.shape), this.genes[this.geneIndex]);
+			this.shape.x = bestMove['shape'].x;
+            this.shape.goBottom(this.matrix);
 		}else{
 			this.shape.copyTo(this.matrix);
 			this._check();
@@ -270,6 +287,14 @@ Tetris.prototype = {
 		views.setGameOver(this.isGameOver);
 		if (this.isGameOver){
 			views.setFinalScore(this.score);
+			this.genes[this.geneIndex]['score'] = this.score;
+			console.log(this.geneIndex + ':  ' + Object.values(this.genes[this.geneIndex]));
+			this.geneIndex++;
+			if (this.geneIndex == 8){
+				this.genes = network.reproduce(this.genes);
+				this.geneIndex = 0;
+			}
+			this._restartHandler();
 		}
 	},
 	// Check and update game data
@@ -301,6 +326,7 @@ Tetris.prototype = {
 
 
 window.Tetris = Tetris;
+
 
 
 

@@ -1,4 +1,305 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+/*
+object-assign
+(c) Sindre Sorhus
+@license MIT
+*/
+
+'use strict';
+/* eslint-disable no-unused-vars */
+var getOwnPropertySymbols = Object.getOwnPropertySymbols;
+var hasOwnProperty = Object.prototype.hasOwnProperty;
+var propIsEnumerable = Object.prototype.propertyIsEnumerable;
+
+function toObject(val) {
+	if (val === null || val === undefined) {
+		throw new TypeError('Object.assign cannot be called with null or undefined');
+	}
+
+	return Object(val);
+}
+
+function shouldUseNative() {
+	try {
+		if (!Object.assign) {
+			return false;
+		}
+
+		// Detect buggy property enumeration order in older V8 versions.
+
+		// https://bugs.chromium.org/p/v8/issues/detail?id=4118
+		var test1 = new String('abc');  // eslint-disable-line no-new-wrappers
+		test1[5] = 'de';
+		if (Object.getOwnPropertyNames(test1)[0] === '5') {
+			return false;
+		}
+
+		// https://bugs.chromium.org/p/v8/issues/detail?id=3056
+		var test2 = {};
+		for (var i = 0; i < 10; i++) {
+			test2['_' + String.fromCharCode(i)] = i;
+		}
+		var order2 = Object.getOwnPropertyNames(test2).map(function (n) {
+			return test2[n];
+		});
+		if (order2.join('') !== '0123456789') {
+			return false;
+		}
+
+		// https://bugs.chromium.org/p/v8/issues/detail?id=3056
+		var test3 = {};
+		'abcdefghijklmnopqrst'.split('').forEach(function (letter) {
+			test3[letter] = letter;
+		});
+		if (Object.keys(Object.assign({}, test3)).join('') !==
+				'abcdefghijklmnopqrst') {
+			return false;
+		}
+
+		return true;
+	} catch (err) {
+		// We don't expect any of the above to throw, but better to be safe.
+		return false;
+	}
+}
+
+module.exports = shouldUseNative() ? Object.assign : function (target, source) {
+	var from;
+	var to = toObject(target);
+	var symbols;
+
+	for (var s = 1; s < arguments.length; s++) {
+		from = Object(arguments[s]);
+
+		for (var key in from) {
+			if (hasOwnProperty.call(from, key)) {
+				to[key] = from[key];
+			}
+		}
+
+		if (getOwnPropertySymbols) {
+			symbols = getOwnPropertySymbols(from);
+			for (var i = 0; i < symbols.length; i++) {
+				if (propIsEnumerable.call(from, symbols[i])) {
+					to[symbols[i]] = from[symbols[i]];
+				}
+			}
+		}
+	}
+
+	return to;
+};
+
+},{}],2:[function(require,module,exports){
+var shapes = require('./shapes.js');
+
+createPopulation = function(popCount){
+    var genes = [];
+    for(var i = 0; i < popCount; i++){
+        genes.push(randomGene());
+    }
+    return genes;
+}
+
+randomGene = function(){
+    var gene = {
+        linesCleared: 0,
+        holesCreated: 0,
+        linesCreated: 0,
+        barricadesCreated: 0,
+    };
+    var keys = Object.keys(gene);
+    var remainingScale = 1.01;
+    for (var i = 0; i < keys.length; i++) {
+        if (i === keys.length - 1){
+            gene[keys[i]] = remainingScale;
+        }
+        else {
+            var scale = Math.random()*remainingScale;
+            remainingScale -= scale;
+            gene[keys[i]] = scale;
+        }
+        gene[keys[i]] = Math.random() < 0.5?gene[keys[i]]:-gene[keys[i]];
+    }
+    return gene;
+};
+
+reproduce = function(genes){
+    genes.sort(function (a, b) {
+        return b.score - a.score;
+    });
+    var newGenes = [];
+    for(var i = 0; i < 4; i++) {
+        var newGene = {};
+        var keys = Object.keys(genes[i]);
+        for (var kIndex = 0; kIndex <keys.length; kIndex++){
+            newGene[keys[kIndex]] = Math.random()<0.5?genes[0][keys[kIndex]]:genes[i][keys[kIndex]];
+        }
+        newGenes.push(newGene);
+    }
+    for (var i = 0; i < 4; i++) {
+        newGenes.push(randomGene());
+    }
+    return newGenes;
+};
+
+calculateMove = function(originalMatrix, originalShape, gene) {
+    var bestMove = {
+        scaledFitness: Number.NEGATIVE_INFINITY
+    };
+    var totalLines = countTotalLines(originalMatrix);
+    for (var i = 0; i < 2; i++) {
+        var matrix = copyMatrix(originalMatrix);
+        var shape = shapes.copyShape(originalShape);
+        var xIndex = i === 0?shape.x + 1:shape.x;
+        shape.x = xIndex;
+        var canMove = canTranslate(i, shape, matrix);
+
+        while (canMove) {
+            if (i === 0) {
+                shape.goLeft(matrix);
+            }
+            else {
+                shape.goRight(matrix);
+            }
+            xIndex = shape.x;
+            while (shape.canDown(matrix)) {
+                shape.goDown(matrix);
+            }
+            shape.copyTo(matrix);
+            var fitness = calculateFitness(matrix, shape, totalLines);
+            var scaledFitness = scaleFitness(fitness, gene);
+            bestMove = bestMove['scaledFitness']<scaledFitness?saveBestMove(scaledFitness, shape):bestMove;
+            matrix = copyMatrix(originalMatrix);
+            shape = shapes.copyShape(originalShape);
+            shape.x = xIndex;
+            canMove = canTranslate(i, shape, matrix);
+        }
+    }
+
+    return bestMove;
+};
+
+canTranslate = function(index, shape, matrix) {
+    var canMove;
+    if (index === 0) {
+        canMove = shape.canLeft(matrix);
+    }
+    else {
+        canMove = shape.canRight(matrix);
+    }
+    return canMove;
+};
+saveBestMove = function(scaledFitness, shape) {
+    var move = {
+        scaledFitness: scaledFitness,
+        shape: shape
+    }
+    return move;
+}
+scaleFitness = function(fitness, gene) {
+    var scaledFitness = 0;
+    for (var weight in gene){
+        if (weight == 'score') {
+            continue;
+        }
+        scaledFitness += gene[weight]*fitness[weight];
+    }
+    return scaledFitness;
+};
+calculateFitness = function(matrix, shape, totalLines) {
+    var linesCleared, linesCreated, holesCreated, barricadesCreated;
+    linesCleared = linesCreated = 0
+    var lines = countTotalLines(matrix);
+    var deltaLines = totalLines - lines;
+    if (deltaLines >= 0) {
+        linesCleared = deltaLines;
+    }
+    else {
+        linesCreated = -deltaLines;
+    }
+    holesCreated = countHoles(matrix, shape);
+    barricadesCreated = countBarricades(matrix, shape);
+
+    var values = {
+        linesCleared: linesCleared,
+        holesCreated: holesCreated,
+        linesCreated: linesCreated,
+        barricadesCreated: barricadesCreated
+    };
+    return values;
+};
+
+countTotalLines = function(matrix) {
+    var rowNumbers = 0;
+    for(var i = 0;i<matrix.length;i++){
+        var row = matrix[i];
+        var occupied = false;
+        for(var j = 0;j<row.length;j++){
+            occupied = row[j]!==0;
+            if (occupied) {
+                rowNumbers++;
+                break;
+            }
+        }
+    }
+    return rowNumbers;
+};
+
+countHoles = function(matrix, shape) {
+    var shapeBox = shape.getBoxes(shape.state);
+
+    var isHole = function(box){
+        var x = shape.x + box.x;
+        var y = shape.y + box.y + 1; //+1 to check under block for hole
+        if ((y >= matrix.length) || (matrix[y][x] != 0)) {
+            return 0;
+        }
+        return 1;
+    };
+    var totalHoles = 0;
+    for(var i in shapeBox){
+        totalHoles += isHole(shapeBox[i]);
+    }
+    return totalHoles;
+};
+
+countBarricades = function(matrix, shape) {
+    var shapeBox = shape.getBoxes(shape.state);
+
+    var isBarricade = function(box){
+        var x = shape.x + box.x;
+        var y = shape.y + box.y + 1; //+1 to check under block for hole
+        for (var i = 1; i <= matrix.length; i++) {
+            if ((y + i >= matrix.length) || (matrix[y][x] != 0)) {
+                return 0;
+            }
+            return 1;
+        }
+    };
+    var totalBarricades = 0;
+    for(var i in shapeBox){
+        totalBarricades += isBarricade(shapeBox[i]);
+    }
+    return totalBarricades;
+};
+
+var copyMatrix = function(matrix){
+    var copiedMatrix = [];
+    for (var i = 0; i<matrix.length;i++){
+        var row = [];
+        copiedMatrix.push(row);
+        for(var j = 0;j<matrix[i].length;j++){
+            row.push(matrix[i][j]);
+        }
+    }
+
+    return copiedMatrix;
+};
+
+module.exports.createPopulation = createPopulation;
+module.exports.reproduce = reproduce;
+},{"./shapes.js":6}],3:[function(require,module,exports){
 
 var utils = require('./utils.js');
 var consts = require('./consts.js');
@@ -161,7 +462,7 @@ var tetrisCanvas = {
 
 
 module.exports = tetrisCanvas;
-},{"./consts.js":2,"./utils.js":5}],2:[function(require,module,exports){
+},{"./consts.js":4,"./utils.js":7}],4:[function(require,module,exports){
 
 //colors for shapes
 var colors = ['#00af9d','#ffb652','#cd66cc','#66bc29','#0096db','#3a7dda','#ffe100'];
@@ -195,8 +496,8 @@ var gridLineColor = 'rgba(255,255,255,0.2)';
 var boxBorderColor = 'rgba(255,255,255,0.5)';
 
 
-// Game speed
-var defaultInterval = 600;
+// Game speed - 600
+var defaultInterval = 3;
 
 
 // Level update interval 
@@ -230,12 +531,13 @@ exports.DEFAULT_INTERVAL = defaultInterval;
 
 exports.LEVEL_INTERVAL = levelInterval;
 
-},{}],3:[function(require,module,exports){
+},{}],5:[function(require,module,exports){
 var utils = require('./utils.js');
 var consts = require('./consts.js');
 var shapes = require('./shapes.js');
 var views = require('./views.js');
 var canvas = require('./canvas.js');
+var network = require('./AI.js');
 
 
 
@@ -254,6 +556,19 @@ var initMatrix = function(rowCount,columnCount){
 	}
 
 	return result;
+};
+
+var copyMatrix = function(matrix){
+    var copiedMatrix = [];
+    for (var i = 0; i<matrix.length;i++){
+        var row = [];
+        copiedMatrix.push(row);
+        for(var j = 0;j<matrix[i].length;j++){
+            row.push(matrix[i][j]);
+        }
+    }
+
+    return copiedMatrix;
 };
 
 /**
@@ -382,12 +697,12 @@ Tetris.prototype = {
 		canvas.init(views.scene,views.preview);
 
 		this.matrix = initMatrix(consts.ROW_COUNT,consts.COLUMN_COUNT);
+		this.genes = network.createPopulation(8);
+        this.geneIndex = 0;
 		this.reset();
 
 		this._initEvents();
 		this._fireShape();
-
-
 	},
 	//Reset game
 	reset:function(){
@@ -493,6 +808,9 @@ Tetris.prototype = {
 	_update:function(){
 		if (this.shape.canDown(this.matrix)){
 			this.shape.goDown(this.matrix);
+			var bestMove = calculateMove(copyMatrix(this.matrix), shapes.copyShape(this.shape), this.genes[this.geneIndex]);
+			this.shape.x = bestMove['shape'].x;
+            this.shape.goBottom(this.matrix);
 		}else{
 			this.shape.copyTo(this.matrix);
 			this._check();
@@ -503,6 +821,14 @@ Tetris.prototype = {
 		views.setGameOver(this.isGameOver);
 		if (this.isGameOver){
 			views.setFinalScore(this.score);
+			this.genes[this.geneIndex]['score'] = this.score;
+			console.log(this.geneIndex + ':  ' + Object.values(this.genes[this.geneIndex]));
+			this.geneIndex++;
+			if (this.geneIndex == 8){
+				this.genes = network.reproduce(this.genes);
+				this.geneIndex = 0;
+			}
+			this._restartHandler();
 		}
 	},
 	// Check and update game data
@@ -540,8 +866,10 @@ window.Tetris = Tetris;
 
 
 
-},{"./canvas.js":1,"./consts.js":2,"./shapes.js":4,"./utils.js":5,"./views.js":6}],4:[function(require,module,exports){
+
+},{"./AI.js":2,"./canvas.js":3,"./consts.js":4,"./shapes.js":6,"./utils.js":7,"./views.js":8}],6:[function(require,module,exports){
 var consts = require('./consts.js');
+const object = require('object-assign');
 var COLORS =  consts.COLORS;
 var COLUMN_COUNT = consts.COLUMN_COUNT;
 
@@ -801,6 +1129,14 @@ ShapeZR.prototype = {
 	canDown:function(matrix){
 		return isShapeCanMove(this,matrix,'down');
 	},
+    //Check if the shape can move right
+    canRight:function(matrix){
+        return isShapeCanMove(this,matrix,'right');
+    },
+    //Check if the shape can move right
+    canLeft:function(matrix){
+        return isShapeCanMove(this,matrix,'left');
+    },
 	//Move the shape down 
 	goDown:function(matrix){
 		if (isShapeCanMove(this,matrix,'down')){
@@ -865,9 +1201,29 @@ function randomShape()
 	return shape;
 }
 
+function copyShape(shape) {
+	var copiedShape;
+    switch(shape.flag)
+    {
+        case 'L': copiedShape = new ShapeL();			break;
+        case 'O': copiedShape = new ShapeO();			break;
+        case 'Z': copiedShape = new ShapeZ();			break;
+        case 'T': copiedShape = new ShapeT();			break;
+        case 'LR': copiedShape = new ShapeLR();			break;
+        case 'ZR': copiedShape = new ShapeZR();			break;
+        case 'I': copiedShape = new ShapeI();			break;
+    }
+    copiedShape.color = shape.color;
+    copiedShape.allBoxes = {};
+    copiedShape.state = shape.state;
+    copiedShape.y = shape.y;
+    copiedShape.x = shape.x
+    return copiedShape;
+}
+module.exports.copyShape = copyShape;
 module.exports.randomShape = randomShape;
 
-},{"./consts.js":2}],5:[function(require,module,exports){
+},{"./consts.js":4,"object-assign":1}],7:[function(require,module,exports){
 
 var exports = module.exports = {};
 
@@ -979,7 +1335,7 @@ exports.$ = $;
 exports.extend = extend;
 exports.proxy = proxy;
 
-},{}],6:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 /**
  All dom definitions and actions
 */
@@ -1100,4 +1456,4 @@ var tetrisView = {
 };
 
 module.exports = tetrisView;
-},{"./consts.js":2,"./utils.js":5}]},{},[3]);
+},{"./consts.js":4,"./utils.js":7}]},{},[5]);

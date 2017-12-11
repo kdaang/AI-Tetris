@@ -1,4 +1,5 @@
 var consts = require('./consts.js');
+const object = require('object-assign');
 var COLORS =  consts.COLORS;
 var COLUMN_COUNT = consts.COLUMN_COUNT;
 
@@ -258,6 +259,14 @@ ShapeZR.prototype = {
 	canDown:function(matrix){
 		return isShapeCanMove(this,matrix,'down');
 	},
+    //Check if the shape can move right
+    canRight:function(matrix){
+        return isShapeCanMove(this,matrix,'right');
+    },
+    //Check if the shape can move right
+    canLeft:function(matrix){
+        return isShapeCanMove(this,matrix,'left');
+    },
 	//Move the shape down 
 	goDown:function(matrix){
 		if (isShapeCanMove(this,matrix,'down')){
@@ -322,4 +331,24 @@ function randomShape()
 	return shape;
 }
 
+function copyShape(shape) {
+	var copiedShape;
+    switch(shape.flag)
+    {
+        case 'L': copiedShape = new ShapeL();			break;
+        case 'O': copiedShape = new ShapeO();			break;
+        case 'Z': copiedShape = new ShapeZ();			break;
+        case 'T': copiedShape = new ShapeT();			break;
+        case 'LR': copiedShape = new ShapeLR();			break;
+        case 'ZR': copiedShape = new ShapeZR();			break;
+        case 'I': copiedShape = new ShapeI();			break;
+    }
+    copiedShape.color = shape.color;
+    copiedShape.allBoxes = {};
+    copiedShape.state = shape.state;
+    copiedShape.y = shape.y;
+    copiedShape.x = shape.x
+    return copiedShape;
+}
+module.exports.copyShape = copyShape;
 module.exports.randomShape = randomShape;
