@@ -267,6 +267,10 @@ ShapeZR.prototype = {
     canLeft:function(matrix){
         return isShapeCanMove(this,matrix,'left');
     },
+    //Check if the shape can rotate
+    canRotate:function(matrix){
+        return isShapeCanMove(this,matrix,'rotate');
+    },
 	//Move the shape down 
 	goDown:function(matrix){
 		if (isShapeCanMove(this,matrix,'down')){
@@ -347,7 +351,7 @@ function copyShape(shape) {
     copiedShape.allBoxes = {};
     copiedShape.state = shape.state;
     copiedShape.y = shape.y;
-    copiedShape.x = shape.x
+    copiedShape.x = shape.x;
     return copiedShape;
 }
 module.exports.copyShape = copyShape;

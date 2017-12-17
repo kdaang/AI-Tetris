@@ -36,9 +36,11 @@ var defaultInterval = 3;
 
 
 // Level update interval 
-var levelInterval = 120 * 1000; 
+var levelInterval = 120 * 1000;
 
+var populationSize = 8;
 
+var mutationProbability = 0.05;
 
 var exports = module.exports = {};
 
@@ -65,3 +67,7 @@ exports.BOX_BORDER_COLOR = boxBorderColor;
 exports.DEFAULT_INTERVAL = defaultInterval;
 
 exports.LEVEL_INTERVAL = levelInterval;
+
+exports.POPULATIONSIZE = populationSize;
+
+exports.MUTATIONPROBABILITY = mutationProbability;

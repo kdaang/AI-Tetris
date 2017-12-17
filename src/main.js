@@ -102,7 +102,7 @@ var checkGameOver = function(matrix){
 	for(var i = 0;i<firstRow.length;i++){
 		if (firstRow[i]!==0){
 			return true;
-		};
+		}
 	}
 	return false;
 };
@@ -163,7 +163,7 @@ Tetris.prototype = {
 		canvas.init(views.scene,views.preview);
 
 		this.matrix = initMatrix(consts.ROW_COUNT,consts.COLUMN_COUNT);
-		this.genes = network.createPopulation(8);
+		this.genes = network.createPopulation(consts.POPULATIONSIZE);
         this.geneIndex = 0;
 		this.reset();
 
@@ -274,8 +274,10 @@ Tetris.prototype = {
 	_update:function(){
 		if (this.shape.canDown(this.matrix)){
 			this.shape.goDown(this.matrix);
-			var bestMove = calculateMove(copyMatrix(this.matrix), shapes.copyShape(this.shape), this.genes[this.geneIndex]);
-			this.shape.x = bestMove['shape'].x;
+			var bestMove = network.calculateAllMoves(copyMatrix(this.matrix), shapes.copyShape(this.shape), this.genes[this.geneIndex]);
+			var bestShape = bestMove['shape'];
+			this.shape.x = bestShape.x;
+			this.shape.state = bestShape.state;
             this.shape.goBottom(this.matrix);
 		}else{
 			this.shape.copyTo(this.matrix);
@@ -290,7 +292,7 @@ Tetris.prototype = {
 			this.genes[this.geneIndex]['score'] = this.score;
 			console.log(this.geneIndex + ':  ' + Object.values(this.genes[this.geneIndex]));
 			this.geneIndex++;
-			if (this.geneIndex == 8){
+			if (this.geneIndex === 8){
 				this.genes = network.reproduce(this.genes);
 				this.geneIndex = 0;
 			}
@@ -322,7 +324,7 @@ Tetris.prototype = {
 			this.levelTime = currentTime;
 		}
 	}
-}
+};
 
 
 window.Tetris = Tetris;

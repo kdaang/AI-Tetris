@@ -92,14 +92,34 @@ module.exports = shouldUseNative() ? Object.assign : function (target, source) {
 
 },{}],2:[function(require,module,exports){
 var shapes = require('./shapes.js');
+var consts = require('./consts.js');
 
 createPopulation = function(popCount){
     var genes = [];
+
     for(var i = 0; i < popCount; i++){
-        genes.push(randomGene());
+        genes.push(initialGene());
     }
+    // for(var i = 0; i < popCount/2; i++){
+    //     genes.push(randomGene());
+    // }
     return genes;
-}
+};
+
+initialGene = function() {
+    var gene = {
+        linesCleared: 100,
+        holesCreated: -100,
+        linesCreated: -50,
+        barricadesCreated: -100,
+        floorHugged: 100,
+        leftWallHugged: 20,
+        rightWallHugged: 20,
+        hugsAnotherPiece: 100
+    };
+
+    return gene;
+};
 
 randomGene = function(){
     var gene = {
@@ -107,21 +127,20 @@ randomGene = function(){
         holesCreated: 0,
         linesCreated: 0,
         barricadesCreated: 0,
+        floorHugged: 0,
+        leftWallHugged: 0,
+        rightWallHugged: 0,
+        hugsAnotherPiece: 0
     };
-    var keys = Object.keys(gene);
-    var remainingScale = 1.01;
-    for (var i = 0; i < keys.length; i++) {
-        if (i === keys.length - 1){
-            gene[keys[i]] = remainingScale;
-        }
-        else {
-            var scale = Math.random()*remainingScale;
-            remainingScale -= scale;
-            gene[keys[i]] = scale;
-        }
-        gene[keys[i]] = Math.random() < 0.5?gene[keys[i]]:-gene[keys[i]];
+
+    for (var key in gene) {
+        gene[key] = generateRandomValue();
     }
     return gene;
+};
+
+var generateRandomValue = function() {
+    return Math.floor(Math.random()*201) - 100;
 };
 
 reproduce = function(genes){
@@ -129,54 +148,66 @@ reproduce = function(genes){
         return b.score - a.score;
     });
     var newGenes = [];
-    for(var i = 0; i < 4; i++) {
+
+    for(var i = 0; i < consts.POPULATIONSIZE - 1; i++) {
         var newGene = {};
         var keys = Object.keys(genes[i]);
         for (var kIndex = 0; kIndex <keys.length; kIndex++){
-            newGene[keys[kIndex]] = Math.random()<0.5?genes[0][keys[kIndex]]:genes[i][keys[kIndex]];
+            newGene[keys[kIndex]] = Math.random()<0?genes[i+1][keys[kIndex]]:genes[0][keys[kIndex]];
+            newGene[keys[kIndex]] = Math.random() < 0 ? generateRandomValue():newGene[keys[kIndex]];
         }
         newGenes.push(newGene);
     }
-    for (var i = 0; i < 4; i++) {
+    for (var i = 0; i < 1; i++) {
         newGenes.push(randomGene());
     }
     return newGenes;
 };
 
-calculateMove = function(originalMatrix, originalShape, gene) {
+calculateAllMoves = function(originalMatrix, originalShape, gene) {
     var bestMove = {
         scaledFitness: Number.NEGATIVE_INFINITY
     };
-    var totalLines = countTotalLines(originalMatrix);
-    for (var i = 0; i < 2; i++) {
-        var matrix = copyMatrix(originalMatrix);
-        var shape = shapes.copyShape(originalShape);
-        var xIndex = i === 0?shape.x + 1:shape.x;
-        shape.x = xIndex;
-        var canMove = canTranslate(i, shape, matrix);
-
-        while (canMove) {
-            if (i === 0) {
-                shape.goLeft(matrix);
-            }
-            else {
-                shape.goRight(matrix);
-            }
-            xIndex = shape.x;
-            while (shape.canDown(matrix)) {
-                shape.goDown(matrix);
-            }
-            shape.copyTo(matrix);
-            var fitness = calculateFitness(matrix, shape, totalLines);
-            var scaledFitness = scaleFitness(fitness, gene);
-            bestMove = bestMove['scaledFitness']<scaledFitness?saveBestMove(scaledFitness, shape):bestMove;
-            matrix = copyMatrix(originalMatrix);
-            shape = shapes.copyShape(originalShape);
+    var rotatedShape = shapes.copyShape(originalShape);
+    var rotatedMatrix = copyMatrix(originalMatrix);
+    var totalLines = countTotalLines(rotatedMatrix);
+    for (var r = 0; r < rotatedShape.states.length; r++) {
+        if (rotatedShape.canRotate(rotatedMatrix) && r !== 0) {
+            rotatedShape.rotate(rotatedMatrix);
+        }
+        for (var i = 0; i < 2; i++) {
+            var matrix = copyMatrix(rotatedMatrix);
+            var shape = shapes.copyShape(rotatedShape);
+            var xIndex = i === 0?shape.x + 1:shape.x;
             shape.x = xIndex;
-            canMove = canTranslate(i, shape, matrix);
+            var canMove = canTranslate(i, shape, matrix);
+
+            while (canMove) {
+                if (i === 0) {
+                    shape.goLeft(matrix);
+                }
+                else {
+                    shape.goRight(matrix);
+                }
+                xIndex = shape.x;
+                while (shape.canDown(matrix)) {
+                    shape.goDown(matrix);
+                }
+                shape.copyTo(matrix);
+                var fitness = calculateFitness(matrix, shape, totalLines);
+                var scaledFitness = scaleFitness(fitness, gene);
+                bestMove = bestMove['scaledFitness']<scaledFitness?saveBestMove(scaledFitness, shape):bestMove;
+                matrix = copyMatrix(rotatedMatrix);
+                shape = shapes.copyShape(rotatedShape);
+                shape.x = xIndex;
+                canMove = canTranslate(i, shape, matrix);
+            }
         }
     }
 
+    if (bestMove['scaledFitness'] == Number.NEGATIVE_INFINITY){
+        console.log('here');
+    }
     return bestMove;
 };
 
@@ -194,9 +225,9 @@ saveBestMove = function(scaledFitness, shape) {
     var move = {
         scaledFitness: scaledFitness,
         shape: shape
-    }
+    };
     return move;
-}
+};
 scaleFitness = function(fitness, gene) {
     var scaledFitness = 0;
     for (var weight in gene){
@@ -205,11 +236,15 @@ scaleFitness = function(fitness, gene) {
         }
         scaledFitness += gene[weight]*fitness[weight];
     }
+    if (isNaN(scaledFitness)){
+        console.log('here');
+    }
     return scaledFitness;
 };
 calculateFitness = function(matrix, shape, totalLines) {
-    var linesCleared, linesCreated, holesCreated, barricadesCreated;
-    linesCleared = linesCreated = 0
+    var linesCleared, linesCreated, holesCreated, barricadesCreated,
+        floorHugged, leftWallHugged, rightWallHugged, hugsAnotherPiece;
+    linesCleared = linesCreated = floorHugged = leftWallHugged = rightWallHugged = hugsAnotherPiece = 0;
     var lines = countTotalLines(matrix);
     var deltaLines = totalLines - lines;
     if (deltaLines >= 0) {
@@ -219,15 +254,98 @@ calculateFitness = function(matrix, shape, totalLines) {
         linesCreated = -deltaLines;
     }
     holesCreated = countHoles(matrix, shape);
+    hugsAnotherPiece = countHugsAnotherPiece(matrix, shape);
     barricadesCreated = countBarricades(matrix, shape);
+    floorHugged = countFloorHugged(matrix, shape);
+    leftWallHugged = countLeftWallHugged(matrix, shape);
+    rightWallHugged = countRightWallHugged(matrix, shape);
 
     var values = {
         linesCleared: linesCleared,
         holesCreated: holesCreated,
         linesCreated: linesCreated,
-        barricadesCreated: barricadesCreated
+        barricadesCreated: barricadesCreated,
+        floorHugged: floorHugged,
+        leftWallHugged: leftWallHugged,
+        rightWallHugged: rightWallHugged,
+        hugsAnotherPiece: hugsAnotherPiece
     };
     return values;
+};
+
+countHugsAnotherPiece = function (matrix, shape) {
+    var TotalHugsAnotherPiece = 0;
+    var shapeMatrix = shape.states[shape.state];
+
+    countTotalHugsAnotherPiece = function (matrix, shape, shapeMatrix, y, x) {
+        x += shape.x;
+        y += shape.y;
+        if ((x >= 0) && (x < matrix[0].length) && (y < matrix.length) &&
+            (matrix[y][x] === 1)) {
+            return 1;
+        }
+        return 0;
+    };
+
+    for (var row = 0; row < shapeMatrix.length; row++) {
+        for (var col = 0; col < shapeMatrix[row].length; col++) {
+            if (shapeMatrix[row][col] === 1){
+                TotalHugsAnotherPiece += countTotalHugsAnotherPiece(matrix, shape, shapeMatrix, row + 1, col);
+                TotalHugsAnotherPiece += countTotalHugsAnotherPiece(matrix, shape, shapeMatrix, row, col - 1);
+                TotalHugsAnotherPiece += countTotalHugsAnotherPiece(matrix, shape, shapeMatrix, row, col + 1);
+            }
+        }
+    }
+
+    return TotalHugsAnotherPiece;
+};
+
+countRightWallHugged = function(matrix, shape) {
+    var isHuggingRightWall = function(box){
+        var x = shape.x + box.x;
+        if (x === matrix[0].length - 1) {
+            return 1;
+        }
+        return 0;
+    };
+    var totalRightWallHugged = 0;
+    var shapeBox = shape.getBoxes(shape.state);
+    for(var i in shapeBox) {
+        totalRightWallHugged += isHuggingRightWall(shapeBox[i]);
+    }
+    return totalRightWallHugged;
+};
+
+countLeftWallHugged = function(matrix, shape) {
+    var isHuggingLeftWall = function(box){
+        var x = shape.x + box.x;
+        if (x === 0) {
+            return 1;
+        }
+        return 0;
+    };
+    var totalLeftWallHugged = 0;
+    var shapeBox = shape.getBoxes(shape.state);
+    for(var i in shapeBox){
+        totalLeftWallHugged += isHuggingLeftWall(shapeBox[i]);
+    }
+    return totalLeftWallHugged;
+};
+
+countFloorHugged = function(matrix, shape) {
+    var isHuggingFloor = function(box){
+        var y = shape.y + box.y;
+        if (y === matrix.length - 1) {
+            return 1;
+        }
+        return 0;
+    };
+    var totalFloorHugged = 0;
+    var shapeBox = shape.getBoxes(shape.state);
+    for(var i in shapeBox){
+        totalFloorHugged += isHuggingFloor(shapeBox[i]);
+    }
+    return totalFloorHugged;
 };
 
 countTotalLines = function(matrix) {
@@ -252,7 +370,7 @@ countHoles = function(matrix, shape) {
     var isHole = function(box){
         var x = shape.x + box.x;
         var y = shape.y + box.y + 1; //+1 to check under block for hole
-        if ((y >= matrix.length) || (matrix[y][x] != 0)) {
+        if ((y >= matrix.length) || (matrix[y][x] !== 0)) {
             return 0;
         }
         return 1;
@@ -271,7 +389,7 @@ countBarricades = function(matrix, shape) {
         var x = shape.x + box.x;
         var y = shape.y + box.y + 1; //+1 to check under block for hole
         for (var i = 1; i <= matrix.length; i++) {
-            if ((y + i >= matrix.length) || (matrix[y][x] != 0)) {
+            if ((y + i >= matrix.length) || (matrix[y][x] !== 0)) {
                 return 0;
             }
             return 1;
@@ -299,7 +417,8 @@ var copyMatrix = function(matrix){
 
 module.exports.createPopulation = createPopulation;
 module.exports.reproduce = reproduce;
-},{"./shapes.js":6}],3:[function(require,module,exports){
+module.exports.calculateAllMoves = calculateAllMoves;
+},{"./consts.js":4,"./shapes.js":6}],3:[function(require,module,exports){
 
 var utils = require('./utils.js');
 var consts = require('./consts.js');
@@ -501,9 +620,11 @@ var defaultInterval = 3;
 
 
 // Level update interval 
-var levelInterval = 120 * 1000; 
+var levelInterval = 120 * 1000;
 
+var populationSize = 8;
 
+var mutationProbability = 0.05;
 
 var exports = module.exports = {};
 
@@ -531,6 +652,9 @@ exports.DEFAULT_INTERVAL = defaultInterval;
 
 exports.LEVEL_INTERVAL = levelInterval;
 
+exports.POPULATIONSIZE = populationSize;
+
+exports.MUTATIONPROBABILITY = mutationProbability;
 },{}],5:[function(require,module,exports){
 var utils = require('./utils.js');
 var consts = require('./consts.js');
@@ -636,7 +760,7 @@ var checkGameOver = function(matrix){
 	for(var i = 0;i<firstRow.length;i++){
 		if (firstRow[i]!==0){
 			return true;
-		};
+		}
 	}
 	return false;
 };
@@ -697,7 +821,7 @@ Tetris.prototype = {
 		canvas.init(views.scene,views.preview);
 
 		this.matrix = initMatrix(consts.ROW_COUNT,consts.COLUMN_COUNT);
-		this.genes = network.createPopulation(8);
+		this.genes = network.createPopulation(consts.POPULATIONSIZE);
         this.geneIndex = 0;
 		this.reset();
 
@@ -808,8 +932,10 @@ Tetris.prototype = {
 	_update:function(){
 		if (this.shape.canDown(this.matrix)){
 			this.shape.goDown(this.matrix);
-			var bestMove = calculateMove(copyMatrix(this.matrix), shapes.copyShape(this.shape), this.genes[this.geneIndex]);
-			this.shape.x = bestMove['shape'].x;
+			var bestMove = network.calculateAllMoves(copyMatrix(this.matrix), shapes.copyShape(this.shape), this.genes[this.geneIndex]);
+			var bestShape = bestMove['shape'];
+			this.shape.x = bestShape.x;
+			this.shape.state = bestShape.state;
             this.shape.goBottom(this.matrix);
 		}else{
 			this.shape.copyTo(this.matrix);
@@ -824,7 +950,7 @@ Tetris.prototype = {
 			this.genes[this.geneIndex]['score'] = this.score;
 			console.log(this.geneIndex + ':  ' + Object.values(this.genes[this.geneIndex]));
 			this.geneIndex++;
-			if (this.geneIndex == 8){
+			if (this.geneIndex === 8){
 				this.genes = network.reproduce(this.genes);
 				this.geneIndex = 0;
 			}
@@ -856,7 +982,7 @@ Tetris.prototype = {
 			this.levelTime = currentTime;
 		}
 	}
-}
+};
 
 
 window.Tetris = Tetris;
@@ -1137,6 +1263,10 @@ ShapeZR.prototype = {
     canLeft:function(matrix){
         return isShapeCanMove(this,matrix,'left');
     },
+    //Check if the shape can rotate
+    canRotate:function(matrix){
+        return isShapeCanMove(this,matrix,'rotate');
+    },
 	//Move the shape down 
 	goDown:function(matrix){
 		if (isShapeCanMove(this,matrix,'down')){
@@ -1217,7 +1347,7 @@ function copyShape(shape) {
     copiedShape.allBoxes = {};
     copiedShape.state = shape.state;
     copiedShape.y = shape.y;
-    copiedShape.x = shape.x
+    copiedShape.x = shape.x;
     return copiedShape;
 }
 module.exports.copyShape = copyShape;
