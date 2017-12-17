@@ -97,25 +97,25 @@ var consts = require('./consts.js');
 createPopulation = function(popCount){
     var genes = [];
 
-    for(var i = 0; i < popCount; i++){
+    for(var i = 0; i < popCount/2; i++){
         genes.push(initialGene());
     }
-    // for(var i = 0; i < popCount/2; i++){
-    //     genes.push(randomGene());
-    // }
+    for(var i = 0; i < popCount/2; i++){
+        genes.push(randomGene());
+    }
     return genes;
 };
 
 initialGene = function() {
     var gene = {
-        linesCleared: 100,
-        holesCreated: -100,
-        linesCreated: -50,
-        barricadesCreated: -100,
-        floorHugged: 100,
-        leftWallHugged: 20,
-        rightWallHugged: 20,
-        hugsAnotherPiece: 100
+        linesCleared: 95,//100
+        holesCreated: 21,//-100
+        linesCreated: -20,//-50
+        barricadesCreated: -67,//-100
+        floorHugged: 50,//50
+        leftWallHugged: 23,//20
+        rightWallHugged: 21,//20
+        hugsAnotherPiece: 23//70
     };
 
     return gene;
@@ -149,16 +149,17 @@ reproduce = function(genes){
     });
     var newGenes = [];
 
-    for(var i = 0; i < consts.POPULATIONSIZE - 1; i++) {
+    newGenes.push(genes[0]);
+    for(var i = 0; i < consts.POPULATIONSIZE/2 - 1; i++) {
         var newGene = {};
         var keys = Object.keys(genes[i]);
         for (var kIndex = 0; kIndex <keys.length; kIndex++){
-            newGene[keys[kIndex]] = Math.random()<0?genes[i+1][keys[kIndex]]:genes[0][keys[kIndex]];
-            newGene[keys[kIndex]] = Math.random() < 0 ? generateRandomValue():newGene[keys[kIndex]];
+            newGene[keys[kIndex]] = Math.random() < 0.5 ?genes[i+1][keys[kIndex]]:genes[0][keys[kIndex]];
+            newGene[keys[kIndex]] = Math.random() < consts.MUTATIONPROBABILITY ? generateRandomValue():newGene[keys[kIndex]];
         }
         newGenes.push(newGene);
     }
-    for (var i = 0; i < 1; i++) {
+    for (var i = 0; i < consts.POPULATIONSIZE/2; i++) {
         newGenes.push(randomGene());
     }
     return newGenes;
@@ -254,11 +255,11 @@ calculateFitness = function(matrix, shape, totalLines) {
         linesCreated = -deltaLines;
     }
     holesCreated = countHoles(matrix, shape);
-    hugsAnotherPiece = countHugsAnotherPiece(matrix, shape);
     barricadesCreated = countBarricades(matrix, shape);
     floorHugged = countFloorHugged(matrix, shape);
     leftWallHugged = countLeftWallHugged(matrix, shape);
     rightWallHugged = countRightWallHugged(matrix, shape);
+    hugsAnotherPiece = countHugsAnotherPiece(matrix, shape);
 
     var values = {
         linesCleared: linesCleared,
@@ -274,14 +275,19 @@ calculateFitness = function(matrix, shape, totalLines) {
 };
 
 countHugsAnotherPiece = function (matrix, shape) {
-    var TotalHugsAnotherPiece = 0;
+    var totalHugsAnotherPiece = 0;
     var shapeMatrix = shape.states[shape.state];
 
     countTotalHugsAnotherPiece = function (matrix, shape, shapeMatrix, y, x) {
+        if (x >= 0 && x < shapeMatrix[0].length && y >= 0 && y < shapeMatrix.length) {
+            if (shapeMatrix[y][x] === 1) {
+                return 0;
+            }
+        }
         x += shape.x;
         y += shape.y;
         if ((x >= 0) && (x < matrix[0].length) && (y < matrix.length) &&
-            (matrix[y][x] === 1)) {
+            (matrix[y][x] !== 0)) {
             return 1;
         }
         return 0;
@@ -290,14 +296,14 @@ countHugsAnotherPiece = function (matrix, shape) {
     for (var row = 0; row < shapeMatrix.length; row++) {
         for (var col = 0; col < shapeMatrix[row].length; col++) {
             if (shapeMatrix[row][col] === 1){
-                TotalHugsAnotherPiece += countTotalHugsAnotherPiece(matrix, shape, shapeMatrix, row + 1, col);
-                TotalHugsAnotherPiece += countTotalHugsAnotherPiece(matrix, shape, shapeMatrix, row, col - 1);
-                TotalHugsAnotherPiece += countTotalHugsAnotherPiece(matrix, shape, shapeMatrix, row, col + 1);
+                totalHugsAnotherPiece += countTotalHugsAnotherPiece(matrix, shape, shapeMatrix, row + 1, col);
+                totalHugsAnotherPiece += countTotalHugsAnotherPiece(matrix, shape, shapeMatrix, row, col - 1);
+                totalHugsAnotherPiece += countTotalHugsAnotherPiece(matrix, shape, shapeMatrix, row, col + 1);
             }
         }
     }
 
-    return TotalHugsAnotherPiece;
+    return totalHugsAnotherPiece;
 };
 
 countRightWallHugged = function(matrix, shape) {
