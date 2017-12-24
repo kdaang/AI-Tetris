@@ -153,12 +153,14 @@ reproduce = function(genes){
     for(var i = 0; i < consts.POPULATIONSIZE/2 - 1; i++) {
         var newGene = {};
         var keys = Object.keys(genes[i]);
-        for (var kIndex = 0; kIndex <keys.length; kIndex++){
-            newGene[keys[kIndex]] = Math.random() < 0.5 ?genes[i+1][keys[kIndex]]:genes[0][keys[kIndex]];
+        for (var kIndex = 0; kIndex <keys.length; kIndex++) {
+            newGene[keys[kIndex]] = (genes[i+1][keys[kIndex]] + genes[0][keys[kIndex]]) / 2;
             newGene[keys[kIndex]] = Math.random() < consts.MUTATIONPROBABILITY ? generateRandomValue():newGene[keys[kIndex]];
         }
         newGenes.push(newGene);
     }
+
+
     for (var i = 0; i < consts.POPULATIONSIZE/2; i++) {
         newGenes.push(randomGene());
     }
